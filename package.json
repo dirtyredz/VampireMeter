@@ -1,0 +1,31 @@
+{
+  "name": "vampiremeter",
+  "displayName": "VampireMeter",
+  "version": "1.0.0",
+  "description": "Skyrim SE mod to ",
+  "scripts": {
+    "compile": "node ./utils/compile.js",
+    "package": "node ./utils/package.js",
+    "deploy:dev": "cross-env NODE_ENV=development npm run update:esp && npm run compile && npm run package",
+    "deploy:prod": "cross-env NODE_ENV=production npm run compile && npm run package",
+    "update:esp": "node ./utils/copy_esp_from_data_dir.js"
+  },
+  "SkyrimSE_Path": "C:/Program Files (x86)/Steam/steamapps/common/Skyrim Special Edition/",
+  "Flags_Path": "Data/Source/Scripts/TESV_Papyrus_Flags.flg",
+  "Imports_Path": [
+    "Data/Source/Scripts",
+    "Data/Scripts/Source"
+  ],
+  "esp": [
+    "VampireMeter"
+  ],
+  "author": "Digital Redz | David McClain (Dirtyredz)",
+  "license": "ISC",
+  "devDependencies": {
+    "archiver": "^3.0.0",
+    "cross-env": "^5.2.0",
+    "del": "^3.0.0",
+    "fs": "0.0.1-security",
+    "path": "^0.12.7"
+  }
+}

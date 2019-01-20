@@ -1,0 +1,7 @@
+/node_modules
+/*.zip
+skyui/*
+!skyui/HUDWidgets
+skyui/HUDWidgets/*
+!skyui/HUDWidgets/VampireMeterWidget.fla
+!skyui/HUDWidgets/VampireMeterWidget.as
