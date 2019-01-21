@@ -1,32 +1,28 @@
 scriptname DR_WidgetBase extends SKI_WidgetBase
 
-; region ------------------ Private variables ------------------
-bool _shown = false
+bool _visible = false
 int _frame = 1
 int _widgetAlpha = 100
 int _scale = 100
-string _controlMode = "periodically"
+string _controlMode = "always"
 string _period = "every1hour"
 int _hotkey = -1
 float _displayTime = 10.0
 bool _displayed = false
 bool _menuOpen = false
-; endRegion
-
-; region ------------------ Properties -------------------------
 
 GlobalVariable property Timescale auto
 {This is the global timescale of the game}
 
-bool property Shown
+bool property Visible
 	{Set to true to show the widget}
 	bool function get()
-		return _shown
+		return _visible
 	endFunction
 
-	function set(bool isShown)
-		_shown = isShown
-		updateShown()
+	function set(bool visibility)
+		_visible = visibility
+		updateVisibility()
 	endFunction
 endProperty
 
@@ -38,7 +34,7 @@ int property WidgetAlpha
 
 	function set(int theAlpha)
 		_widgetAlpha = theAlpha
-		updateShown()
+		updateVisibility()
 	endFunction
 endProperty
 
@@ -64,7 +60,7 @@ string property ControlMode
 
 	function set(string mode)
 		_controlMode = mode
-		updateConfig()
+		updateControl()
 	endFunction
 endProperty
 
@@ -76,7 +72,7 @@ string property Period
 
 	function set(string mode)
 		_period = mode
-		updateConfig()
+		updateControl()
 	endFunction
 endProperty
 
@@ -88,7 +84,7 @@ int property Hotkey
 
 	function set(int myHotkey)
 		_hotkey = myHotkey
-		updateConfig()
+		updateControl()
 	endFunction
 endProperty
 
@@ -103,12 +99,10 @@ float property DisplayTime
 	endFunction
 endProperty
 
-; endRegion
-
-; region ------------------ Events -----------------------------
 
 ; @override SKI_WidgetBase
 event OnWidgetReset()
+  debug.trace(self + " - OnWidgetReset ran.")
 	; Update the scale *before* calling OnWidgetReset prevents the widget to
 	; be displayed at a wrong position if scale != 100%.
 	updateScale()
@@ -117,6 +111,8 @@ event OnWidgetReset()
 
 	; Update event registrations
 	UnregisterForAllMenus()
+  UnregisterForUpdateGameTime() ; Unregister this event because it could be registered by an old save
+	UnregisterForUpdate()
 
 	RegisterForMenu("BarterMenu")
 	RegisterForMenu("Book Menu")
@@ -156,8 +152,12 @@ event OnWidgetReset()
 	RegisterForMenu("TweenMenu ")
 
 	; Register all needed events
-	updateConfig()
-	RegisterForModEvent("Periodically", "OnPeriodically")
+	updateControl()
+endEvent
+
+event OnUpdateGameTime()
+  setPeriodicUpdate()
+  showTimed()
 endEvent
 
 ; @override SKI_WidgetBase
@@ -168,15 +168,11 @@ event OnWidgetLoad()
 	OnWidgetReset()
 
 	; Determine if the widget should be displayed
-	updateShown()
+	updateVisibility()
 endEvent
 
 event OnMenuOpen(String menuName)
 	_menuOpen = true
-
-	if(Ready)
-		;UI.Invoke(HUD_MENU, WidgetRoot + ".PauseUpdate") 
-	endIf
 endEvent
 
 event OnMenuClose(String menuName)
@@ -184,88 +180,78 @@ event OnMenuClose(String menuName)
 endEvent
 
 event OnKeyUp(int keyCode, float holdTime)
-	if(!_menuOpen && _shown)
-		if(_controlMode == "timedHotkey" || _controlMode == "periodically")
-			showTimed()
-		else
-			if(_displayed)
-				hideWidget()
-				_displayed = false
-			else
-				showWidget()
-				_displayed = true
-			endIf
-		endIf
-	endIf
+  if keyCode == _hotkey
+    if(!_menuOpen && _visible)
+      if(_controlMode == "timedHotkey" || _controlMode == "periodically")
+        showTimed()
+      else
+        if(_controlMode == "toggledHotkey")
+          _displayed = !_displayed
+          updateVisibility()
+        endIf
+      endIf
+    endIf
+  endIf
 endEvent
 
-; This even occurs ever 15 in-game minutes and decides if the widget should
-; be shown because of the periodic control mode.
-event OnPeriodically(string eventName, string strArg, float numArg, Form sender)
-	if(_controlMode == "periodically")
-		bool showIt = false
-		int hour = Math.Floor(numArg / 60) as int
-		int minute = (numArg as int) % 60 as int
-
-		if(_period == "every15min" && minute % 15 == 0)
-			showIt = true
-		elseIf(_period == "every30min" && minute % 30 == 0)
-			showIt = true
-		elseIf(minute == 0)
-			if(_period == "every1hour")
-				showIt = true
-			elseIf(_period == "every2hours" && hour % 2 == 0)
-				showIt = true
-			elseIf(_period == "every3hours" && hour % 3 == 0)
-				showIt = true
-			elseIf(_period == "every6hours" && hour % 6 == 0)
-				showIt = true
-			elseIf(_period == "every12hours" && hour % 12 == 0)
-				showIt = true
-			endIf
-		endIf
-
-		if(showIt)
-			showTimed()
-		endIf
-	endIf
-endEvent
-
-;endRegion
-
-; region ------------------ Functions --------------------------
 
 ; Shows the widget for _displayTime seconds.
-function showTimed()
+function showTimed(float displayTimeOverride = 0.0)
+  ; debug.trace(self + " - showTimed, " + _displayTime + ", " + _controlMode)
+  float time = _displayTime
+  if displayTimeOverride > 0.0
+    time = displayTimeOverride
+  endIf
 	showWidget()
-	Utility.Wait(_displayTime)
+	Utility.Wait(time)
+  _displayed = false
 	; The control mode might have changed, so check again.
 	if(_controlMode == "timedHotkey" || _controlMode == "periodically")
 		hideWidget()
+  elseIf(_controlMode == "toggledHotkey")
+    updateVisibility()
 	endIf
 endFunction
 
 ; Shows the widget if the control mode is set to always, registers
 ; the hotkey otherwise.
-function updateConfig()
+function updateControl()
+  ; debug.trace(self + " - updateControl, " + _visible + ", " + _controlMode)
 	; Cleanup
 	UnregisterForAllKeys()
+  UnregisterForUpdateGameTime()
 
-	if(_controlMode == "always" && _shown)
-		showWidget()
-	else
-		hideWidget()
-		_displayed = false
-		RegisterForKey(_hotkey)
-		if(_controlMode != "periodically")
-			_period = "none"
-		endIf
-	endIf
+  updateVisibility()
+  RegisterForKey(_hotkey)
+  if(_controlMode == "periodically")
+    setPeriodicUpdate()
+  endIf
+endFunction
+
+function setPeriodicUpdate()
+  UnregisterForUpdateGameTime()
+
+  if(_period == "every15min")
+    RegisterForSingleUpdateGameTime(0.25)
+  elseIf(_period == "every30min")
+    RegisterForSingleUpdateGameTime(0.50)
+  elseif(_period == "every1hour")
+    RegisterForSingleUpdateGameTime(1)
+  elseIf(_period == "every2hours")
+    RegisterForSingleUpdateGameTime(2)
+  elseIf(_period == "every3hours")
+    RegisterForSingleUpdateGameTime(3)
+  elseIf(_period == "every6hours")
+    RegisterForSingleUpdateGameTime(6)
+  elseIf(_period == "every12hours")
+    RegisterForSingleUpdateGameTime(12)
+  endIf
 endFunction
 
 ; Shows the widget if it should be shown, hides it otherwise.
-function updateShown()
-	if(_shown && (_controlMode == "always" || (_controlMode == "toggledHotkey" && _displayed)))
+function updateVisibility()
+  ; debug.trace(self + " - updateVisibility, " + _visible + ", " + _controlMode + ", " + _displayed)
+	if(_visible && (_controlMode == "always" || (_controlMode == "toggledHotkey" && _displayed)))
 		showWidget()
 	else
 		hideWidget()
@@ -274,7 +260,9 @@ endFunction
 
 ; Shows the widget.
 function showWidget()
+  ; debug.trace(self + " - showWidget, " + _widgetAlpha)
 	if(Ready)
+    _displayed = true
     UI.InvokeBool(HUD_MENU, WidgetRoot + ".setVisible", true)
 		UpdateWidgetModes()
 		FadeTo(_widgetAlpha, 0.2)
@@ -283,14 +271,15 @@ endFunction
 
 ; Hides the widget.
 function hideWidget()
+  ; debug.trace(self + " - hideWidget")
 	if(Ready)
+    _displayed = false
 		FadeTo(0, 0.2)
 	endIf
 endFunction
 
 ; Populates the scale to the widget.
 function updateScale()
+  ; debug.trace(self + " - updateScale, " + _scale)
 	UI.SetInt(HUD_MENU, WidgetRoot + ".Scale", _scale)
 endFunction
-
-;endRegion

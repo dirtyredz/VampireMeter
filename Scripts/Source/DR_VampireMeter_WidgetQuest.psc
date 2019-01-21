@@ -1,26 +1,24 @@
 Scriptname DR_VampireMeter_WidgetQuest extends DR_WidgetBase
 
-; region ------------------ Properties -------------------------
 
 GlobalVariable property GameDaysPassed Auto
 GlobalVariable Property PlayerIsVampire Auto
 GlobalVariable Property GameHour Auto
-
 WorldSpace Property Sovngarde Auto ;
+SPELL Property DR_VampireMeter_PlayerOnEnterSpell Auto
+
 {Grab the vanilla player vampire quest script (Controlls feeding/progression)}
 playervampirequestscript Property VampQuest Auto
 
-
-; endRegion
-
-; region ------------------ Private variables ------------------
 
 int _currentStage = 0
 int _currentFrame = 0
 float _lastFeedTime = 0.0
 float _timeSinceFeeding = 0.0
 int _lastStage = 4
-bool _sunToggle = false
+bool _sunToggle = true
+bool _cellChangeToggle = true
+WorldSpace _currentWorldSpace
 
 bool property SunToggle
 	{Set to true to show the widget}
@@ -33,9 +31,17 @@ bool property SunToggle
 	endFunction
 endProperty
 
-; endRegion
 
-; region ------------------ Events -----------------------------
+bool property CellChangeToggle
+	{Set to true to show the widget}
+	bool function get()
+		return _cellChangeToggle
+	endFunction
+
+	function set(bool isShown)
+		_cellChangeToggle = isShown
+	endFunction
+endProperty
 
 ; @overrides SKI_WidgetBase
 string function GetWidgetSource()
@@ -54,13 +60,16 @@ event OnWidgetReset()
 	; Update event registrations
   UnregisterForUpdateGameTime() ; Unregister this event because it could be registered by an old save
 	UnregisterForUpdate()
-	RegisterForSingleUpdate(10.0) ; in-game seconds, ignores menus
+	RegisterForSingleUpdate(5.0) ; in seconds, ignores menus
+
+  Game.GetPlayer().AddSpell(DR_VampireMeter_PlayerOnEnterSpell, false)
+
   UpdateWidget()
 endEvent
 
 event OnUpdate()
 	; Set the time to ensure the correct periodic display.
-	RegisterForSingleUpdate(10.0) ; in-game seconds, ignores menus
+	RegisterForSingleUpdate(5.0) ; in seconds, ignores menus
   UpdateWidget()
 endEvent
 
@@ -69,15 +78,30 @@ event OnMenuClose(String menuName)
   UpdateWidget()
 endEvent
 
-;endRegion
+; not sure if anyone actually uses this event
+Event OnVampireFeed(Actor akTarget)
+  UpdateWidget() ; Player just fed lets update
+  showTimed(15.0) ; force show the widget
+endEvent
 
-; region ------------------ Functions --------------------------
+; PlayerVampireQuestScript fires this event when being cured or being turned
+Event OnVampirismStateChanged(bool abIsVampire)
+  UnregisterForUpdateGameTime() ; Unregister this event because it could be registered by an old save
+  UnregisterForUpdate()
+  UpdateWidget()
+  if (abIsVampire)
+    RegisterForSingleUpdate(5.0) ; Were now a vampire lets update every 5 seconds
+  else
+    RegisterForSingleUpdate(300.0) ; Not a vampire anymore only check every 5 min
+  endIf
+endEvent
 
 function UpdateWidget()
   if PlayerIsVampire.GetValue()
     ; Show the widget
-    Shown = true
-
+    if !Visible
+      Visible = true
+    endIf
     ; Update stats
     updateVampireStats()
 
@@ -89,11 +113,14 @@ function UpdateWidget()
 
     ; check for progression
     progressionCheck()
+
+    if _sunToggle
+      CheckForSunlight()
+    endIf
   else
-    Shown = false
-  endIf
-  if _sunToggle
-    CheckForSunlight()
+    if Visible
+      Visible = false
+    endIf
   endIf
 endFunction
 
@@ -144,4 +171,15 @@ function progressionCheck()
     VampQuest.OnUpdateGameTime()
   endIf
 endFunction
-; endRegion
+
+function showOnCellChange(Actor player)
+  ; Get worldspace so we can compare, we only want to trigger on load screens.
+  WorldSpace playerPlace = player.GetWorldSpace()
+  ;debug.trace(self + " - " + playerPlace + ", " + _currentWorldSpace + ", " + (_currentWorldSpace != playerPlace))
+  if _currentWorldSpace != playerPlace
+    _currentWorldSpace = playerPlace ; Save the world space so the next time we change cells we can compare the old and new worldspace
+    if _cellChangeToggle
+      showTimed(5.0)
+    endIf
+  endIf
+endFunction

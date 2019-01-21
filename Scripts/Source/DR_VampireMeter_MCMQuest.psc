@@ -12,7 +12,7 @@ string[]	_controlModeValues
 int _controlModeDefault = 0
 int _controlModSelectedIndex = 0
 int _scaleDefault = 100
-int _displayTimeDefault = 15
+float _displayTimeDefault = 15.0
 int _alphaDefault = 100
 string[]	_horizontalAlignments
 string[]	_horizontalAlignmentValues
@@ -119,6 +119,7 @@ Event OnPageReset(string page)
     AddHeaderOption("Other")
     AddEmptyOption() ;Adds a space before the next option is added.
     AddToggleOptionST("SunToggle", "Sun Toggle", Widget.SunToggle)
+    AddToggleOptionST("CellChangeToggle", "Cell Change Toggle", Widget.CellChangeToggle)
 
     SetCursorPosition(1)
     AddHeaderOption("Display Position/Size")
@@ -137,7 +138,6 @@ Event OnPageReset(string page)
   EndIf
 EndEvent
 
-; Begin Flag Functions
 
 int function get_Periodic_Flag()
   if _controlModSelectedIndex == 3
@@ -167,7 +167,7 @@ int function get_Hokey_Unbind_Flag()
   return OPTION_FLAG_HIDDEN
 endFunction
 
-; Begin State Controls
+
 
 state Periodic ; Menu
   event OnMenuOpenST()
@@ -232,7 +232,7 @@ state Display_Time ; Slider
 	endEvent
 
 	event OnSliderAcceptST(float value)
-		Widget.DisplayTime = value as int
+		Widget.DisplayTime = value
 		SetSliderOptionValueST(Widget.DisplayTime, "{0} Seconds")
 	endEvent
 
@@ -511,9 +511,22 @@ state SunToggle
     EndIf
   EndEvent
 EndState
-; End State Controls
 
-; Begin private function
+state CellChangeToggle
+  Event OnHighlightST()
+    SetInfoText("Will display the meter when loading into a new cell (going through a load screen).")
+  EndEvent
+
+  Event OnSelectST()
+    If Widget.CellChangeToggle ;If the ToggleA Global Variable is 1, or rather, if our toggle option in the menu is checked
+      Widget.CellChangeToggle = false ;sets the Global Variable to 0
+      SetToggleOptionValueST(0) ;Sets the toggle display in the menu to unchecked. Optionally disable something in your mod here, or use the ToggleA global variable elsewhere.
+    else ;If the ToggleA is 0, or rather, if our toggle option is unchecked
+      Widget.CellChangeToggle = true ;set’s the Global Variable to 1
+      SetToggleOptionValueST(1) ;Set’s the toggle display in the menu to checked. Optionally enable something in your mod here, or use the ToggleA global variable elsewhere.
+    EndIf
+  EndEvent
+EndState
 
 ; Checks if the newly assigned key is conflicting with another mod and asks
 ; the user if we should go on. Return true if no conflict or ignore.
@@ -531,5 +544,3 @@ bool function CheckNewHotkey(string conflictControl, string conflictName)
 
 	return true
 endFunction
-
-; End private Functions
