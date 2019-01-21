@@ -31,7 +31,6 @@ bool property SunToggle
 	endFunction
 endProperty
 
-
 bool property CellChangeToggle
 	{Set to true to show the widget}
 	bool function get()
@@ -40,6 +39,8 @@ bool property CellChangeToggle
 
 	function set(bool isShown)
 		_cellChangeToggle = isShown
+    ; were a Vmpire and want to track
+    updateTrackingSpell()
 	endFunction
 endProperty
 
@@ -61,8 +62,6 @@ event OnWidgetReset()
   UnregisterForUpdateGameTime() ; Unregister this event because it could be registered by an old save
 	UnregisterForUpdate()
 	RegisterForSingleUpdate(5.0) ; in seconds, ignores menus
-
-  Game.GetPlayer().AddSpell(DR_VampireMeter_PlayerOnEnterSpell, false)
 
   UpdateWidget()
 endEvent
@@ -91,17 +90,17 @@ Event OnVampirismStateChanged(bool abIsVampire)
   UpdateWidget()
   if (abIsVampire)
     RegisterForSingleUpdate(5.0) ; Were now a vampire lets update every 5 seconds
-  else
-    RegisterForSingleUpdate(300.0) ; Not a vampire anymore only check every 5 min
   endIf
 endEvent
 
 function UpdateWidget()
   if PlayerIsVampire.GetValue()
-    ; Show the widget
     if !Visible
       Visible = true
     endIf
+    ; Update Tracking Spell
+    updateTrackingSpell()
+
     ; Update stats
     updateVampireStats()
 
@@ -181,5 +180,19 @@ function showOnCellChange(Actor player)
     if _cellChangeToggle
       showTimed(5.0)
     endIf
+  endIf
+endFunction
+
+function updateTrackingSpell()
+  if PlayerIsVampire.GetValue() && _cellChangeToggle
+    ; dont have the tracking spell so add it
+    if !Game.GetPlayer().HasSpell(DR_VampireMeter_PlayerOnEnterSpell)
+      debug.trace(self + " - Added Tracking Spell")
+      Game.GetPlayer().AddSpell(DR_VampireMeter_PlayerOnEnterSpell, false)
+    endIf
+  else
+    ; not a vampire we dont need the tracking spell
+    debug.trace(self + " - Removed Tracking Spell")
+    Game.GetPlayer().RemoveSpell(DR_VampireMeter_PlayerOnEnterSpell)
   endIf
 endFunction
